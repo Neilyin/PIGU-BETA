@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 內容工廠</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #e8e7e4;
+    --text: #37352f;
+    --muted: #9b9a97;
+    --blue: #3b82f6;   --blue-bg: #eff6ff;
+    --purple: #8b5cf6; --purple-bg: #f5f3ff;
+    --green: #10b981;  --green-bg: #ecfdf5;
+    --orange: #f59e0b; --orange-bg: #fffbeb;
+    --pink: #ec4899;   --pink-bg: #fdf2f8;
+    --cyan: #06b6d4;   --cyan-bg: #ecfeff;
+    --red: #ef4444;
+    --sidebar-w: 224px;
+    --r: 10px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+
+  /* ── Sidebar ─────────────────────────────────────── */
+  aside {
+    width: var(--sidebar-w); background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 12px 8px;
+    gap: 2px; flex-shrink: 0;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px 14px; font-weight: 700; font-size: 15px;
+    border-bottom: 1px solid var(--border); margin-bottom: 8px;
+  }
+  .logo-icon { font-size: 22px; }
+  .logo-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+  .nav-sec { font-size: 11px; font-weight: 600; color: var(--muted); padding: 10px 12px 4px; text-transform: uppercase; letter-spacing: .5px; }
+  .nav {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 12px; border-radius: 7px; cursor: pointer;
+    font-size: 13.5px; font-weight: 500; color: var(--muted);
+    transition: background .12s, color .12s; white-space: nowrap;
+    user-select: none;
+  }
+  .nav:hover { background: var(--bg); color: var(--text); }
+  .nav.active { background: var(--bg); color: var(--text); font-weight: 600; }
+  .nav .ni { font-size: 17px; width: 22px; text-align: center; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+
+  /* ── Main ────────────────────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .topbar {
+    height: 50px; background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 24px; gap: 10px;
+    font-size: 15px; font-weight: 600; flex-shrink: 0;
+  }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .content { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+  /* ── Pages ───────────────────────────────────────── */
+  .page { display: none; }
+  .page.on { display: block; }
+  .ph { margin-bottom: 22px; }
+  .ph h1 { font-size: 22px; font-weight: 700; }
+  .ph p { color: var(--muted); font-size: 13px; margin-top: 3px; }
+
+  /* ── Card / Grid ─────────────────────────────────── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; margin-bottom: 14px; }
+  .card-title { font-size: 13.5px; font-weight: 600; margin-bottom: 11px; display: flex; align-items: center; gap: 7px; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 900px) { .g3,.g4 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .g2,.g3,.g4 { grid-template-columns: 1fr; } }
+
+  /* ── Form ────────────────────────────────────────── */
+  label { font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 4px; display: block; }
+  input, textarea, select {
+    width: 100%; padding: 8px 11px; border: 1px solid var(--border);
+    border-radius: 7px; font-size: 13.5px; font-family: inherit;
+    background: var(--bg); color: var(--text); outline: none; transition: border .18s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--blue); background: #fff; }
+  textarea { resize: vertical; min-height: 80px; }
+  .field { margin-bottom: 11px; }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 8px 15px; border-radius: 7px; font-size: 13.5px;
+    font-weight: 500; cursor: pointer; border: none;
+    transition: filter .15s, box-shadow .15s; white-space: nowrap;
+  }
+  .btn:hover { filter: brightness(.93); }
+  .btn:active { filter: brightness(.87); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+  .btn-blue   { background: var(--blue);   color: #fff; }
+  .btn-purple { background: var(--purple); color: #fff; }
+  .btn-green  { background: var(--green);  color: #fff; }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-pink   { background: var(--pink);   color: #fff; }
+  .btn-cyan   { background: var(--cyan);   color: #fff; }
+  .btn-ghost  { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); color: var(--text); filter: none; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-danger { background: #fee2e2; color: var(--red); }
+
+  /* ── Output box ──────────────────────────────────── */
+  .out {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 15px; min-height: 110px;
+    font-size: 13.5px; line-height: 1.75; white-space: pre-wrap;
+    font-family: inherit; max-height: 58vh; overflow-y: auto;
+  }
+  .out.streaming::after { content: "▊"; animation: blink .55s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── Tabs ────────────────────────────────────────── */
+  .tabs { display: flex; gap: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; margin-bottom: 14px; }
+  .tab { flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; text-align: center; color: var(--muted); transition: all .12s; }
+  .tab.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.09); }
+  .tpanel { display: none; }
+  .tpanel.on { display: block; }
+
+  /* ── Stats ───────────────────────────────────────── */
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; }
+  .stat-icon { font-size: 22px; margin-bottom: 7px; }
+  .stat-num { font-size: 26px; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Table ───────────────────────────────────────── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { background: var(--bg); padding: 9px 11px; text-align: left; font-weight: 600; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .tbl td { padding: 9px 11px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: var(--bg); }
+  .empty-row td { text-align: center; color: var(--muted); padding: 28px; }
+
+  /* ── Calendar ────────────────────────────────────── */
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; }
+  .cal-hdr { text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); padding: 3px; }
+  .cal-day { min-height: 74px; border: 1px solid var(--border); border-radius: 6px; padding: 5px; background: var(--surface); }
+  .cal-dn { font-size: 11.5px; font-weight: 600; margin-bottom: 3px; }
+  .cal-ev { font-size: 10.5px; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+
+  /* ── Platform tags ───────────────────────────────── */
+  .ptag { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .pt-youtube   { background: #fee2e2; color: #b91c1c; }
+  .pt-instagram { background: #fce7f3; color: #9d174d; }
+  .pt-threads   { background: #f3f4f6; color: #374151; }
+  .pt-facebook  { background: #dbeafe; color: #1d4ed8; }
+  .pt-tiktok    { background: #d1fae5; color: #065f46; }
+  .pt-dcard     { background: #ede9fe; color: #5b21b6; }
+
+  /* ── Status tags ─────────────────────────────────── */
+  .st-planned   { background: #e0e7ff; color: #3730a3; }
+  .st-draft     { background: #fef3c7; color: #92400e; }
+  .st-published { background: #d1fae5; color: #065f46; }
+
+  /* ── Quick chips ─────────────────────────────────── */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 4px 11px; font-size: 12px; cursor: pointer; transition: all .12s; }
+  .chip:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ── Accent bar ──────────────────────────────────── */
+  .abar { width: 3px; height: 18px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── Modal ───────────────────────────────────────── */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.32); z-index: 200; align-items: center; justify-content: center; }
+  .overlay.on { display: flex; }
+  .modal { background: #fff; border-radius: 12px; padding: 22px; width: 500px; max-width: 95vw; max-height: 88vh; overflow-y: auto; }
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+  /* ── Toast ───────────────────────────────────────── */
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(60px); background: #1a1a1a; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; transition: transform .25s; z-index: 999; pointer-events: none; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Misc ────────────────────────────────────────── */
+  .flex { display: flex; align-items: center; }
+  .gap8 { gap: 8px; }
+  .ml-auto { margin-left: auto; }
+  .text-muted { color: var(--muted); }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb { background: #d4d3d0; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside>
+  <div class="logo">
+    <span class="logo-icon">🏭</span>
+    <div><div>AI 內容工廠</div><div class="logo-sub">一人自媒體團隊</div></div>
+  </div>
+  <div class="nav-sec">工作台</div>
+  <div class="nav active" data-page="home"><span class="ni">🏠</span> 首頁總覽</div>
+  <div class="nav-sec">AI 團隊</div>
+  <div class="nav" data-page="news"><span class="ni">📰</span> 找新聞的<span class="dot" style="background:var(--blue)"></span></div>
+  <div class="nav" data-page="script"><span class="ni">🎬</span> 腳本生產師<span class="dot" style="background:var(--purple)"></span></div>
+  <div class="nav" data-page="article"><span class="ni">✍️</span> 文章生產師<span class="dot" style="background:var(--green)"></span></div>
+  <div class="nav" data-page="graphic"><span class="ni">🖼️</span> 圖文生產師<span class="dot" style="background:var(--orange)"></span></div>
+  <div class="nav-sec">管理</div>
+  <div class="nav" data-page="pm"><span class="ni">📋</span> PM 管理師<span class="dot" style="background:var(--pink)"></span></div>
+  <div class="nav" data-page="analytics"><span class="ni">📊</span> 數據管理師<span class="dot" style="background:var(--cyan)"></span></div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
+  <div class="topbar">
+    <span id="tb-icon">🏠</span>
+    <span id="tb-title">首頁總覽</span>
+    <span class="badge ml-auto" id="tb-badge"></span>
+  </div>
+  <div class="content">
+
+    <!-- ═══════════════ HOME ═══════════════ -->
+    <div class="page on" id="page-home">
+      <div class="ph"><h1>歡迎回來 👋</h1><p>你的 AI 一人內容工廠，6 個 AI 員工 24 小時待命</p></div>
+      <div class="g4" style="margin-bottom:20px">
+        <div class="stat"><div class="stat-icon">📁</div><div class="stat-num" id="s-projects">0</div><div class="stat-label">已存內容</div></div>
+        <div class="stat"><div class="stat-icon">📅</div><div class="stat-num" id="s-schedule">0</div><div class="stat-label">排程貼文</div></div>
+        <div class="stat"><div class="stat-icon">📊</div><div class="stat-num" id="s-analytics">0</div><div class="stat-label">追蹤連結</div></div>
+        <div class="stat"><div class="stat-icon">🤖</div><div class="stat-num">6</div><div class="stat-label">AI 團隊成員</div></div>
+      </div>
+      <div class="g3">
+        <div class="card" style="border-top:3px solid var(--blue);cursor:pointer" onclick="goto('news')">
+          <div class="card-title">📰 找新聞的</div>
+          <p class="text-muted">搜尋最新 AI/科技熱門話題</p>
+          <div style="margin-top:11px"><button class="btn btn-blue btn-sm">開始搜尋</button></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--purple);cursor:pointer" onclick="goto('script')">
+          <div class="card-title">🎬 腳本生產師</div>
+          <p class="text-muted">話題 → 完整影片腳本 + CTA</p>
+          <div style="margin-top:11px"><button class="btn btn-purple btn-sm">生成腳本</button></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--green);cursor:pointer" onclick="goto('article')">
+          <div class="card-title">✍️ 文章生產師</div>
+          <p class="text-muted">SEO 深度文章，方格子/Medium</p>
+          <div style="margin-top:11px"><button class="btn btn-green btn-sm">生成文章</button></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--orange);cursor:pointer" onclick="goto('graphic')">
+          <div class="card-title">🖼️ 圖文生產師</div>
+          <p class="text-muted">一鍵生成 6 大平台貼文</p>
+          <div style="margin-top:11px"><button class="btn btn-orange btn-sm">生成圖文</button></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--pink);cursor:pointer" onclick="goto('pm')">
+          <div class="card-title">📋 PM 管理師</div>
+          <p class="text-muted">內容排程 + 商業價值分析</p>
+          <div style="margin-top:11px"><button class="btn btn-pink btn-sm">開啟排程</button></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--cyan);cursor:pointer" onclick="goto('analytics')">
+          <div class="card-title">📊 數據管理師</div>
+          <p class="text-muted">追蹤各平台數據 + AI 洞察</p>
+          <div style="margin-top:11px"><button class="btn btn-cyan btn-sm">查看數據</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ NEWS ═══════════════ -->
+    <div class="page" id="page-news">
+      <div class="ph"><h1>📰 找新聞的</h1><p>即時搜尋最新 AI/科技熱門話題</p></div>
+      <div class="g2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--blue)"></div>搜尋設定</div>
+          <div class="field"><label>搜尋關鍵字</label><input id="news-kw" value="AI 科技最新動態"></div>
+          <div class="chips" style="margin-bottom:12px">
+            <span class="chip" onclick="$('news-kw').value=this.textContent">ChatGPT 最新</span>
+            <span class="chip" onclick="$('news-kw').value=this.textContent">AI 創業趨勢</span>
+            <span class="chip" onclick="$('news-kw').value=this.textContent">台灣科技新聞</span>
+            <span class="chip" onclick="$('news-kw').value=this.textContent">AI 工具新功能</span>
+          </div>
+          <button class="btn btn-blue" id="news-btn" onclick="doNews()">🔍 搜尋熱門話題</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--blue)"></div>搜尋完後可以…</div>
+          <p class="text-muted" style="margin-bottom:11px">複製感興趣的話題，直接在各生產師中使用</p>
+          <div class="chips">
+            <span class="chip" onclick="goto('script')">🎬 做成腳本</span>
+            <span class="chip" onclick="goto('article')">✍️ 寫成文章</span>
+            <span class="chip" onclick="goto('graphic')">🖼️ 做圖文</span>
+            <span class="chip" onclick="goto('pm')">📋 PM 分析</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title flex gap8"><div class="abar" style="background:var(--blue)"></div>搜尋結果
+          <span class="ml-auto flex gap8">
+            <button class="btn btn-ghost btn-sm" onclick="copy('news-out')">📋 複製</button>
+          </span>
+        </div>
+        <div class="out" id="news-out">點擊「搜尋熱門話題」開始...</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ SCRIPT ═══════════════ -->
+    <div class="page" id="page-script">
+      <div class="ph"><h1>🎬 腳本生產師</h1><p>輸入主題，立即生成完整影片腳本</p></div>
+      <div class="g2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--purple)"></div>腳本設定</div>
+          <div class="field"><label>影片主題</label><input id="script-topic" placeholder="e.g. GPT-5 正式發布，改變了什麼？"></div>
+          <div class="field"><label>背景資料（可選）</label><textarea id="script-ctx" placeholder="貼上相關新聞、數據..."></textarea></div>
+          <button class="btn btn-purple" id="script-btn" onclick="doScript()">✨ 生成腳本</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--purple)"></div>快速套用主題</div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <button class="btn btn-ghost" onclick="$('script-topic').value='Claude vs ChatGPT：2025年哪個更強？'">Claude vs ChatGPT 比較</button>
+            <button class="btn btn-ghost" onclick="$('script-topic').value='用 AI 一個月賺到第一桶金'">AI 副業賺錢</button>
+            <button class="btn btn-ghost" onclick="$('script-topic').value='台灣 AI 新創最新動態'">台灣 AI 新創</button>
+            <button class="btn btn-ghost" onclick="$('script-topic').value='Cursor AI 讓工程師失業了嗎？'">AI 取代工程師？</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title flex gap8"><div class="abar" style="background:var(--purple)"></div>生成結果
+          <span class="ml-auto flex gap8">
+            <button class="btn btn-ghost btn-sm" onclick="copy('script-out')">📋 複製</button>
+            <button class="btn btn-ghost btn-sm" onclick="saveContent('script')">💾 存檔</button>
+          </span>
+        </div>
+        <div class="out" id="script-out">輸入主題後點擊「生成腳本」...</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ ARTICLE ═══════════════ -->
+    <div class="page" id="page-article">
+      <div class="ph"><h1>✍️ 文章生產師</h1><p>生成完整 SEO 深度文章</p></div>
+      <div class="g2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--green)"></div>文章設定</div>
+          <div class="field"><label>文章主題</label><input id="article-topic" placeholder="e.g. AI 工具如何改變自媒體創作方式"></div>
+          <div class="field"><label>參考資料（可選）</label><textarea id="article-ctx" placeholder="貼上相關資料、新聞..."></textarea></div>
+          <button class="btn btn-green" id="article-btn" onclick="doArticle()">✨ 生成文章</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--green)"></div>快速套用主題</div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <button class="btn btn-ghost" onclick="$('article-topic').value='2025年 AI 工具完整推薦指南'">AI 工具推薦指南</button>
+            <button class="btn btn-ghost" onclick="$('article-topic').value='AI 如何幫創作者提升 10 倍效率'">AI 提升效率</button>
+            <button class="btn btn-ghost" onclick="$('article-topic').value='Prompt Engineering 終極指南'">Prompt 教學</button>
+            <button class="btn btn-ghost" onclick="$('article-topic').value='台灣自媒體 2025 完整生存指南'">自媒體生存指南</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title flex gap8"><div class="abar" style="background:var(--green)"></div>生成結果
+          <span class="ml-auto flex gap8">
+            <button class="btn btn-ghost btn-sm" onclick="copy('article-out')">📋 複製</button>
+            <button class="btn btn-ghost btn-sm" onclick="saveContent('article')">💾 存檔</button>
+          </span>
+        </div>
+        <div class="out" id="article-out">輸入主題後點擊「生成文章」...</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ GRAPHIC ═══════════════ -->
+    <div class="page" id="page-graphic">
+      <div class="ph"><h1>🖼️ 圖文生產師</h1><p>一鍵生成 YouTube / IG / FB / Threads / TikTok / Dcard 全平台貼文</p></div>
+      <div class="g2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--orange)"></div>貼文設定</div>
+          <div class="field"><label>貼文主題</label><input id="graphic-topic" placeholder="e.g. OpenAI 發布 o3，超越人類水平"></div>
+          <div class="field"><label>背景資料（可選）</label><textarea id="graphic-ctx" placeholder="貼上新聞摘要..."></textarea></div>
+          <button class="btn btn-orange" id="graphic-btn" onclick="doGraphic()">✨ 生成各平台貼文</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--orange)"></div>支援平台</div>
+          <div class="chips" style="margin-bottom:10px">
+            <span class="ptag pt-youtube">📺 YouTube</span>
+            <span class="ptag pt-instagram">📸 Instagram</span>
+            <span class="ptag pt-threads">🧵 Threads</span>
+            <span class="ptag pt-facebook">📘 Facebook</span>
+            <span class="ptag pt-dcard">💬 Dcard</span>
+            <span class="ptag pt-tiktok">🎵 TikTok</span>
+          </div>
+          <p class="text-muted" style="font-size:13px">每個平台都根據其用戶習慣調整文案風格與長度</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title flex gap8"><div class="abar" style="background:var(--orange)"></div>生成結果
+          <span class="ml-auto flex gap8">
+            <button class="btn btn-ghost btn-sm" onclick="copy('graphic-out')">📋 複製</button>
+            <button class="btn btn-ghost btn-sm" onclick="saveContent('graphic')">💾 存檔</button>
+          </span>
+        </div>
+        <div class="out" id="graphic-out">輸入主題後點擊「生成各平台貼文」...</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ PM ═══════════════ -->
+    <div class="page" id="page-pm">
+      <div class="ph"><h1>📋 PM 管理師</h1><p>內容排程日曆 + 商業策略分析</p></div>
+      <div class="tabs">
+        <div class="tab on" data-pm="schedule">📅 排程日曆</div>
+        <div class="tab" data-pm="analyze">💰 商業分析</div>
+        <div class="tab" data-pm="saved">📁 已存內容</div>
+      </div>
+
+      <!-- 排程 -->
+      <div class="tpanel on" id="pm-schedule">
+        <div class="flex gap8" style="margin-bottom:14px">
+          <button class="btn btn-ghost btn-sm" onclick="calPrev()">‹</button>
+          <span id="cal-label" style="font-weight:600;font-size:14px;min-width:90px;text-align:center"></span>
+          <button class="btn btn-ghost btn-sm" onclick="calNext()">›</button>
+          <button class="btn btn-pink ml-auto" onclick="openSchModal()">+ 新增排程</button>
+        </div>
+        <div class="card">
+          <div class="cal-grid" id="cal-hdrs"></div>
+          <div style="margin-top:6px"><div class="cal-grid" id="cal-days"></div></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-title">📋 排程列表</div>
+          <table class="tbl"><thead><tr><th>日期</th><th>時間</th><th>平台</th><th>標題</th><th>狀態</th><th>操作</th></tr></thead>
+          <tbody id="sch-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <!-- 商業分析 -->
+      <div class="tpanel" id="pm-analyze">
+        <div class="g2" style="margin-bottom:14px">
+          <div class="card">
+            <div class="card-title"><div class="abar" style="background:var(--pink)"></div>分析設定</div>
+            <div class="field"><label>分析主題</label><input id="pm-topic" placeholder="e.g. AI 工具教學影片系列"></div>
+            <div class="field"><label>補充資訊（可選）</label><textarea id="pm-ctx" placeholder="目標受眾、頻道定位、訂閱數..."></textarea></div>
+            <button class="btn btn-pink" id="pm-btn" onclick="doPM()">📊 開始分析</button>
+          </div>
+          <div class="card">
+            <div class="card-title"><div class="abar" style="background:var(--pink)"></div>分析包含</div>
+            <ul style="display:flex;flex-direction:column;gap:8px;color:var(--muted);list-style:none;font-size:13px">
+              <li>💰 商業價值評分</li><li>🤝 品牌合作機會</li>
+              <li>📅 建議發布排程表</li><li>🔥 競品差異化分析</li>
+              <li>📈 KPI 目標設定</li><li>✅ 本週行動清單</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title flex gap8"><div class="abar" style="background:var(--pink)"></div>分析報告
+            <span class="ml-auto flex gap8"><button class="btn btn-ghost btn-sm" onclick="copy('pm-out')">📋 複製</button></span>
+          </div>
+          <div class="out" id="pm-out">輸入主題後點擊「開始分析」...</div>
+        </div>
+      </div>
+
+      <!-- 已存內容 -->
+      <div class="tpanel" id="pm-saved">
+        <div class="card">
+          <div class="card-title">📁 已存內容庫</div>
+          <table class="tbl"><thead><tr><th>類型</th><th>標題摘要</th><th>存檔時間</th><th>操作</th></tr></thead>
+          <tbody id="saved-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ ANALYTICS ═══════════════ -->
+    <div class="page" id="page-analytics">
+      <div class="ph"><h1>📊 數據管理師</h1><p>追蹤各平台發布內容的數據表現</p></div>
+      <div class="tabs">
+        <div class="tab on" data-an="track">🔗 數據追蹤</div>
+        <div class="tab" data-an="insight">🧠 AI 洞察</div>
+        <div class="tab" data-an="chart">📈 趨勢圖表</div>
+      </div>
+
+      <!-- 數據追蹤 -->
+      <div class="tpanel on" id="an-track">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title"><div class="abar" style="background:var(--cyan)"></div>新增追蹤記錄</div>
+          <div class="g2" style="margin-bottom:11px">
+            <div class="field"><label>內容連結</label>
+              <div class="flex gap8">
+                <input id="an-url" placeholder="https://youtube.com/watch?v=...">
+                <button class="btn btn-cyan btn-sm" onclick="autoFetch()" style="flex-shrink:0">🤖 自動抓</button>
+              </div>
+            </div>
+            <div class="field"><label>平台</label>
+              <select id="an-platform">
+                <option value="youtube">📺 YouTube</option>
+                <option value="instagram">📸 Instagram</option>
+                <option value="threads">🧵 Threads</option>
+                <option value="facebook">📘 Facebook</option>
+                <option value="tiktok">🎵 TikTok</option>
+                <option value="dcard">💬 Dcard</option>
+              </select>
+            </div>
+            <div class="field"><label>內容標題</label><input id="an-title" placeholder="影片/文章標題"></div>
+            <div></div>
+            <div class="field"><label>👁 觀看 / 瀏覽</label><input type="number" id="an-views" placeholder="0"></div>
+            <div class="field"><label>❤️ 按讚</label><input type="number" id="an-likes" placeholder="0"></div>
+            <div class="field"><label>💬 留言</label><input type="number" id="an-comments" placeholder="0"></div>
+            <div class="field"><label>📤 分享</label><input type="number" id="an-shares" placeholder="0"></div>
+            <div class="field"><label>👥 粉絲變化 (±)</label><input type="number" id="an-followers" placeholder="0"></div>
+            <div class="field"><label>備註</label><input id="an-notes" placeholder="特殊說明..."></div>
+          </div>
+          <button class="btn btn-cyan" onclick="addAnalytics()">💾 儲存這筆數據</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--cyan)"></div>數據紀錄</div>
+          <table class="tbl">
+            <thead><tr><th>平台</th><th>標題</th><th>👁 觀看</th><th>❤️ 按讚</th><th>💬 留言</th><th>📤 分享</th><th>記錄時間</th><th></th></tr></thead>
+            <tbody id="an-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AI 洞察 -->
+      <div class="tpanel" id="an-insight">
+        <div class="g2" style="margin-bottom:14px">
+          <div class="card">
+            <div class="card-title"><div class="abar" style="background:var(--cyan)"></div>AI 數據分析</div>
+            <div class="field"><label>數據摘要（手動輸入或點下方自動填入）</label>
+              <textarea id="insight-data" style="min-height:130px" placeholder="e.g.&#10;YouTube《AI工具教學》&#10;Day1: 觀看5000 按讚200 留言15&#10;Day7: 觀看12000 按讚450 留言38"></textarea>
+            </div>
+            <div class="flex gap8">
+              <button class="btn btn-cyan" id="insight-btn" onclick="doInsight()">🧠 AI 分析</button>
+              <button class="btn btn-ghost btn-sm" onclick="fillInsightAuto()">📊 從紀錄填入</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><div class="abar" style="background:var(--cyan)"></div>分析面向</div>
+            <ul style="display:flex;flex-direction:column;gap:8px;color:var(--muted);list-style:none;font-size:13px">
+              <li>📈 整體表現解讀</li><li>🌟 亮點發現</li>
+              <li>⚠️ 需改進的地方</li><li>💡 立即可執行的優化</li>
+              <li>🎯 下週行動計畫</li><li>📅 建議追蹤頻率</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title flex gap8"><div class="abar" style="background:var(--cyan)"></div>AI 洞察報告
+            <span class="ml-auto"><button class="btn btn-ghost btn-sm" onclick="copy('insight-out')">📋 複製</button></span>
+          </div>
+          <div class="out" id="insight-out">輸入數據後點擊「AI 分析」...</div>
+        </div>
+      </div>
+
+      <!-- 圖表 -->
+      <div class="tpanel" id="an-chart">
+        <div class="card">
+          <div class="card-title"><div class="abar" style="background:var(--cyan)"></div>數據趨勢</div>
+          <div class="flex gap8" style="margin-bottom:12px">
+            <select id="chart-metric" onchange="renderChart()" style="width:auto">
+              <option value="views">👁 觀看次數</option>
+              <option value="likes">❤️ 按讚數</option>
+              <option value="comments">💬 留言數</option>
+              <option value="shares">📤 分享數</option>
+            </select>
+          </div>
+          <canvas id="an-chart" style="max-height:300px"></canvas>
+          <p class="text-muted" style="margin-top:10px;font-size:12px;text-align:center" id="chart-empty"></p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div>
+
+<!-- ── Modals ── -->
+<div class="overlay" id="sch-modal">
+  <div class="modal">
+    <h2>📅 新增排程</h2>
+    <div class="field"><label>標題</label><input id="sm-title" placeholder="貼文/影片標題"></div>
+    <div class="g2">
+      <div class="field"><label>平台</label>
+        <select id="sm-platform">
+          <option value="youtube">📺 YouTube</option><option value="instagram">📸 Instagram</option>
+          <option value="threads">🧵 Threads</option><option value="facebook">📘 Facebook</option>
+          <option value="tiktok">🎵 TikTok</option><option value="dcard">💬 Dcard</option>
+        </select>
+      </div>
+      <div class="field"><label>狀態</label>
+        <select id="sm-status">
+          <option value="planned">計畫中</option><option value="draft">草稿</option><option value="published">已發布</option>
+        </select>
+      </div>
+      <div class="field"><label>發布日期</label><input type="date" id="sm-date"></div>
+      <div class="field"><label>發布時間</label><input type="time" id="sm-time" value="18:00"></div>
+    </div>
+    <div class="field"><label>備註</label><textarea id="sm-notes" style="min-height:60px" placeholder="..."></textarea></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('sch-modal')">取消</button>
+      <button class="btn btn-pink" onclick="saveSch()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">✅ 複製成功</div>
+
+<script>
+// ─────────────── DB (localStorage) ───────────────────────────────────────────
+const DB = {
+  get: k => JSON.parse(localStorage.getItem('aif_' + k) || '[]'),
+  set: (k, v) => localStorage.setItem('aif_' + k, JSON.stringify(v)),
+  push(k, item) { const a = this.get(k); a.push({...item, id: Date.now()}); this.set(k, a); return a; },
+  del(k, id) { const a = this.get(k).filter(x => x.id !== id); this.set(k, a); return a; },
+};
+
+// ─────────────── Router ───────────────────────────────────────────────────────
+const PAGES = {
+  home:      {title:'首頁總覽',    icon:'🏠', badge:''},
+  news:      {title:'找新聞的',    icon:'📰', badge:'即時搜尋'},
+  script:    {title:'腳本生產師',  icon:'🎬', badge:'AI 生成'},
+  article:   {title:'文章生產師',  icon:'✍️',  badge:'AI 生成'},
+  graphic:   {title:'圖文生產師',  icon:'🖼️',  badge:'多平台'},
+  pm:        {title:'PM 管理師',   icon:'📋', badge:'策略'},
+  analytics: {title:'數據管理師',  icon:'📊', badge:'追蹤'},
+};
+
+function $(id) { return document.getElementById(id); }
+function goto(p) { activatePage(p); }
+
+document.querySelectorAll('.nav[data-page]').forEach(el => {
+  el.addEventListener('click', () => activatePage(el.dataset.page));
+});
+
+function activatePage(p) {
+  document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));
+  $('page-' + p).classList.add('on');
+  document.querySelector(`.nav[data-page="${p}"]`)?.classList.add('active');
+  const cfg = PAGES[p];
+  $('tb-icon').textContent = cfg.icon;
+  $('tb-title').textContent = cfg.title;
+  $('tb-badge').textContent = cfg.badge;
+  if (p === 'home') loadHome();
+  if (p === 'pm')   { loadSch(); loadSaved(); renderCal(); }
+  if (p === 'analytics') { loadAnalytics(); }
+}
+
+// Tabs
+document.querySelectorAll('.tab[data-pm]').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab[data-pm]').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('#page-pm .tpanel').forEach(x => x.classList.remove('on'));
+  t.classList.add('on');
+  $('pm-' + t.dataset.pm).classList.add('on');
+  if (t.dataset.pm === 'saved') loadSaved();
+}));
+document.querySelectorAll('.tab[data-an]').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab[data-an]').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('#page-analytics .tpanel').forEach(x => x.classList.remove('on'));
+  t.classList.add('on');
+  $('an-' + t.dataset.an).classList.add('on');
+  if (t.dataset.an === 'chart') renderChart();
+}));
+
+// ─────────────── SSE Stream ───────────────────────────────────────────────────
+async function stream(url, body, outId, btnId) {
+  const out = $(outId), btn = $(btnId);
+  out.textContent = '';
+  out.classList.add('streaming');
+  if (btn) btn.disabled = true;
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) { out.textContent = '❌ HTTP ' + resp.status; return; }
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const raw = line.slice(5).trim();
+        if (raw === '[DONE]') continue;
+        try { out.textContent += JSON.parse(raw); out.scrollTop = out.scrollHeight; } catch {}
+      }
+    }
+  } catch(e) {
+    out.textContent = '❌ ' + e.message;
+  } finally {
+    out.classList.remove('streaming');
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ─────────────── Agent Actions ────────────────────────────────────────────────
+function doNews()    { stream('/api/news',    {keyword: $('news-kw').value || 'AI 科技最新動態'}, 'news-out', 'news-btn'); }
+function doScript()  {
+  if (!$('script-topic').value)  { toast('⚠️ 請輸入主題'); return; }
+  stream('/api/script',  {topic:$('script-topic').value,  context:$('script-ctx').value},   'script-out',  'script-btn');
+}
+function doArticle() {
+  if (!$('article-topic').value) { toast('⚠️ 請輸入主題'); return; }
+  stream('/api/article', {topic:$('article-topic').value, context:$('article-ctx').value},  'article-out', 'article-btn');
+}
+function doGraphic() {
+  if (!$('graphic-topic').value) { toast('⚠️ 請輸入主題'); return; }
+  stream('/api/graphic', {topic:$('graphic-topic').value, context:$('graphic-ctx').value},  'graphic-out', 'graphic-btn');
+}
+function doPM()      {
+  if (!$('pm-topic').value)      { toast('⚠️ 請輸入主題'); return; }
+  stream('/api/pm',      {topic:$('pm-topic').value,      context:$('pm-ctx').value},       'pm-out',      'pm-btn');
+}
+function doInsight() {
+  if (!$('insight-data').value)  { toast('⚠️ 請輸入數據'); return; }
+  stream('/api/insight', {topic:$('insight-data').value}, 'insight-out', 'insight-btn');
+}
+
+// ─────────────── Save Content ─────────────────────────────────────────────────
+function saveContent(type) {
+  const out = $(type + '-out');
+  if (!out.textContent || out.textContent.includes('輸入主題')) { toast('⚠️ 請先生成內容'); return; }
+  DB.push('saved', {
+    type, preview: out.textContent.slice(0, 80) + '…',
+    full: out.textContent, at: new Date().toLocaleString('zh-TW'),
+  });
+  toast('💾 已儲存至 PM → 已存內容');
+}
+
+// ─────────────── Home Stats ───────────────────────────────────────────────────
+function loadHome() {
+  $('s-projects').textContent = DB.get('saved').length;
+  $('s-schedule').textContent = DB.get('schedule').length;
+  $('s-analytics').textContent = DB.get('analytics').length;
+}
+
+// ─────────────── Schedule ─────────────────────────────────────────────────────
+const CAL = { y: new Date().getFullYear(), m: new Date().getMonth() };
+
+function calPrev() { CAL.m--; if(CAL.m<0){CAL.m=11;CAL.y--;} renderCal(); }
+function calNext() { CAL.m++; if(CAL.m>11){CAL.m=0;CAL.y++;} renderCal(); }
+
+function renderCal() {
+  const data = DB.get('schedule');
+  const days = ['日','一','二','三','四','五','六'];
+  $('cal-hdrs').innerHTML = days.map(d=>`<div class="cal-hdr">${d}</div>`).join('');
+  $('cal-label').textContent = `${CAL.y}年 ${CAL.m+1}月`;
+  const first = new Date(CAL.y, CAL.m, 1).getDay();
+  const total = new Date(CAL.y, CAL.m+1, 0).getDate();
+  let html = '<div></div>'.repeat(first);
+  const today = new Date();
+  for (let d=1; d<=total; d++) {
+    const ds = `${CAL.y}-${String(CAL.m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evs = data.filter(s=>s.date===ds);
+    const isToday = today.getFullYear()===CAL.y && today.getMonth()===CAL.m && today.getDate()===d;
+    html += `<div class="cal-day" style="${isToday?'border-color:var(--blue);border-width:2px':''}">
+      <div class="cal-dn" style="${isToday?'color:var(--blue)':''}">${d}</div>
+      ${evs.map(e=>`<div class="cal-ev" style="background:var(--${platformColor(e.platform)}-bg);color:var(--${platformColor(e.platform)})" title="${e.title}">${platformEmoji(e.platform)} ${e.title}</div>`).join('')}
+    </div>`;
+  }
+  $('cal-days').innerHTML = html;
+}
+
+function openSchModal() {
+  $('sm-date').value = new Date().toISOString().slice(0,10);
+  $('sch-modal').classList.add('on');
+}
+function saveSch() {
+  const t = $('sm-title').value;
+  if (!t) { toast('⚠️ 請填寫標題'); return; }
+  DB.push('schedule', {
+    title: t, platform: $('sm-platform').value,
+    date: $('sm-date').value, time: $('sm-time').value,
+    status: $('sm-status').value, notes: $('sm-notes').value,
+  });
+  closeModal('sch-modal');
+  loadSch(); renderCal();
+}
+function loadSch() {
+  const data = DB.get('schedule');
+  $('sch-tbody').innerHTML = data.length ? data.map(s=>`
+    <tr>
+      <td>${s.date}</td><td>${s.time}</td>
+      <td><span class="ptag pt-${s.platform}">${platformEmoji(s.platform)} ${s.platform}</span></td>
+      <td>${s.title}</td>
+      <td><span class="badge st-${s.status}">${statusLabel(s.status)}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="delSch(${s.id})">刪除</button></td>
+    </tr>`).join('')
+    : '<tr class="empty-row"><td colspan="6">尚無排程，點擊「新增排程」開始</td></tr>';
+}
+function delSch(id) { if(!confirm('確定刪除？'))return; DB.del('schedule',id); loadSch(); renderCal(); }
+
+// ─────────────── Saved Content ────────────────────────────────────────────────
+function loadSaved() {
+  const data = DB.get('saved');
+  $('saved-tbody').innerHTML = data.length ? data.map(s=>`
+    <tr>
+      <td><span class="badge" style="background:var(--${typeColor(s.type)}-bg);color:var(--${typeColor(s.type)})">${typeLabel(s.type)}</span></td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.preview}</td>
+      <td style="color:var(--muted);font-size:12px">${s.at}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="viewSaved(${s.id})">查看</button>
+        <button class="btn btn-danger btn-sm" onclick="delSaved(${s.id})">刪除</button>
+      </td>
+    </tr>`).join('')
+    : '<tr class="empty-row"><td colspan="4">尚無存檔，在各生產師點擊「存檔」</td></tr>';
+}
+function viewSaved(id) {
+  const item = DB.get('saved').find(x=>x.id===id);
+  if (!item) return;
+  // Navigate to the right page and fill the output
+  const page = item.type; goto(page);
+  setTimeout(() => { $(page+'-out').textContent = item.full; }, 100);
+}
+function delSaved(id) { if(!confirm('確定刪除？'))return; DB.del('saved',id); loadSaved(); }
+
+// ─────────────── Analytics ────────────────────────────────────────────────────
+function addAnalytics() {
+  const url = $('an-url').value, title = $('an-title').value;
+  if (!url || !title) { toast('⚠️ 請填寫連結和標題'); return; }
+  DB.push('analytics', {
+    url, title, platform: $('an-platform').value,
+    views: +$('an-views').value||0, likes: +$('an-likes').value||0,
+    comments: +$('an-comments').value||0, shares: +$('an-shares').value||0,
+    followers: +$('an-followers').value||0, notes: $('an-notes').value,
+    at: new Date().toLocaleString('zh-TW'),
+  });
+  ['an-url','an-title','an-views','an-likes','an-comments','an-shares','an-followers','an-notes'].forEach(id=>$(id).value='');
+  loadAnalytics(); toast('✅ 數據已儲存');
+}
+function loadAnalytics() {
+  const data = DB.get('analytics');
+  $('an-tbody').innerHTML = data.length ? data.map(a=>`
+    <tr>
+      <td><span class="ptag pt-${a.platform}">${platformEmoji(a.platform)}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        <a href="${a.url}" target="_blank" style="color:var(--blue);text-decoration:none">${a.title}</a>
+      </td>
+      <td>${(a.views||0).toLocaleString()}</td>
+      <td>${(a.likes||0).toLocaleString()}</td>
+      <td>${(a.comments||0).toLocaleString()}</td>
+      <td>${(a.shares||0).toLocaleString()}</td>
+      <td style="color:var(--muted);font-size:11.5px">${a.at}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="delAn(${a.id})">刪除</button></td>
+    </tr>`).join('')
+    : '<tr class="empty-row"><td colspan="8">尚無數據，新增追蹤記錄開始</td></tr>';
+}
+function delAn(id) { if(!confirm('確定刪除？'))return; DB.del('analytics',id); loadAnalytics(); }
+
+async function autoFetch() {
+  const url = $('an-url').value;
+  if (!url) { toast('⚠️ 請先輸入連結'); return; }
+  const btn = event.target; btn.textContent='⏳'; btn.disabled=true;
+  try {
+    // Try to get meta info via fetch (only works for CORS-open sites)
+    toast('🤖 嘗試自動抓取中...');
+    // For YouTube, we can try to get the title from oEmbed
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`).then(r=>r.json()).catch(()=>null);
+      if (oembed?.title) { $('an-title').value = oembed.title; toast('✅ 已自動填入標題'); }
+      else toast('⚠️ YouTube 需手動輸入數據');
+    } else toast('⚠️ 此平台需手動輸入數據');
+  } catch { toast('⚠️ 無法自動抓取，請手動輸入'); }
+  finally { btn.textContent='🤖 自動抓'; btn.disabled=false; }
+}
+
+function fillInsightAuto() {
+  const data = DB.get('analytics');
+  if (!data.length) { toast('⚠️ 尚無數據紀錄'); return; }
+  const grouped = {};
+  data.forEach(a => { if(!grouped[a.title])grouped[a.title]=[]; grouped[a.title].push(a); });
+  let txt = '';
+  for (const [title, records] of Object.entries(grouped)) {
+    txt += `\n【${title}】\n`;
+    records.forEach(r => { txt += `${r.at.slice(0,10)}: 觀看${r.views} 按讚${r.likes} 留言${r.comments} 分享${r.shares}\n`; });
+  }
+  $('insight-data').value = txt.trim();
+  toast('✅ 已自動填入');
+}
+
+let chartInst = null;
+function renderChart() {
+  const data = DB.get('analytics');
+  const metric = $('chart-metric')?.value || 'views';
+  const labels = data.map(a => a.title.slice(0,12) + ' ' + (a.at||'').slice(0,10));
+  const vals = data.map(a => a[metric] || 0);
+  $('chart-empty').textContent = data.length ? '' : '尚無數據，請先新增追蹤記錄';
+  const ctx = $('an-chart').getContext('2d');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ label: {views:'觀看',likes:'按讚',comments:'留言',shares:'分享'}[metric], data: vals, borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,.1)', tension:.4, fill:true, pointBackgroundColor:'#06b6d4' }] },
+    options: { responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0ee'}}, x:{grid:{display:false},ticks:{font:{size:11}}} } },
+  });
+}
+
+// ─────────────── Modal / Toast ────────────────────────────────────────────────
+function closeModal(id) { $(id).classList.remove('on'); }
+document.querySelectorAll('.overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('on'); });
+});
+
+let toastTimer;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function copy(id) {
+  const txt = $(id).textContent;
+  navigator.clipboard.writeText(txt).then(() => toast('📋 已複製到剪貼簿'));
+}
+
+// ─────────────── Utils ────────────────────────────────────────────────────────
+const PLATFORM_EMOJI = {youtube:'📺',instagram:'📸',threads:'🧵',facebook:'📘',tiktok:'🎵',dcard:'💬'};
+const PLATFORM_COLOR = {youtube:'red',instagram:'pink',threads:'muted',facebook:'blue',tiktok:'green',dcard:'purple'};
+function platformEmoji(p) { return PLATFORM_EMOJI[p]||'🌐'; }
+function platformColor(p) { return p==='youtube'?'red':p==='instagram'?'pink':p==='facebook'?'blue':p==='tiktok'?'green':p==='dcard'?'purple':'muted'; }
+function statusLabel(s) { return {planned:'計畫中',draft:'草稿',published:'已發布'}[s]||s; }
+function typeLabel(t) { return {script:'🎬 腳本',article:'✍️ 文章',graphic:'🖼️ 圖文',news:'📰 新聞'}[t]||t; }
+function typeColor(t) { return {script:'purple',article:'green',graphic:'orange',news:'blue',pm:'pink'}[t]||'blue'; }
+
+// ─────────────── Init ─────────────────────────────────────────────────────────
+loadHome();
+// Check API health
+fetch('/api/health').then(r=>r.json()).then(d=>{ if(!d.api_key_set) toast('⚠️ 請在 Vercel 設定 ANTHROPIC_API_KEY'); }).catch(()=>{});
+</script>
+</body>
+</html>
