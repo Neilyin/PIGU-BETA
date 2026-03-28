@@ -1,10 +1,10 @@
 """
 AI 內容工廠 — Vercel Serverless API
-所有 Claude AI 串流端點集中在此檔案
+使用 Google Gemini API（免費方案）
 """
 import json
 import os
-import anthropic
+import google.generativeai as genai
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -14,13 +14,20 @@ from typing import Optional
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-MODEL = "claude-opus-4-6"
+MODEL = "gemini-2.0-flash"
 
-def get_client():
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
+def get_model(system: str, use_web_search: bool = False):
+    key = os.environ.get("GEMINI_API_KEY", "")
     if not key:
-        raise ValueError("Missing ANTHROPIC_API_KEY")
-    return anthropic.Anthropic(api_key=key)
+        raise ValueError("Missing GEMINI_API_KEY")
+    genai.configure(api_key=key)
+    kwargs = {
+        "model_name": MODEL,
+        "system_instruction": system,
+    }
+    if use_web_search:
+        kwargs["tools"] = "google_search_retrieval"
+    return genai.GenerativeModel(**kwargs)
 
 # ── Request Models ─────────────────────────────────────────────────────────────
 class NewsReq(BaseModel):
@@ -34,22 +41,11 @@ class ContentReq(BaseModel):
 def stream_response(system: str, user_msg: str, use_web_search: bool = False):
     def generate():
         try:
-            client = get_client()
-            kwargs = dict(
-                model=MODEL,
-                max_tokens=8096,
-                system=system,
-                messages=[{"role": "user", "content": user_msg}],
-                thinking={"type": "adaptive"},
-            )
-            if use_web_search:
-                kwargs["tools"] = [
-                    {"type": "web_search_20260209", "name": "web_search"},
-                    {"type": "web_fetch_20260209", "name": "web_fetch"},
-                ]
-            with client.messages.stream(**kwargs) as stream:
-                for text in stream.text_stream:
-                    yield f"data: {json.dumps(text, ensure_ascii=False)}\n\n"
+            model = get_model(system, use_web_search)
+            response = model.generate_content(user_msg, stream=True)
+            for chunk in response:
+                if chunk.text:
+                    yield f"data: {json.dumps(chunk.text, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
             yield f"data: {json.dumps('❌ ' + str(e))}\n\n"
@@ -228,7 +224,6 @@ async def pm(req: ContentReq):
 | 日期 | 平台 | 內容 | 說明 |
 |------|------|------|------|
 | Day 1 | YouTube | 完整影片 | ... |
-...
 
 ---
 ## 🔥 差異化建議
@@ -272,5 +267,5 @@ async def insight(req: ContentReq):
 # ── Health check ───────────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health():
-    has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "api_key_set": has_key}
+    has_key = bool(os.environ.get("GEMINI_API_KEY"))
+    return {"status": "ok", "model": MODEL, "api_key_set": has_key}
