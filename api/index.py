@@ -14,7 +14,7 @@ from typing import Optional
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-MODEL = "gemini-1.5-flash"
+MODEL = "gemini-2.0-flash-lite"
 
 def get_model(system: str, use_web_search: bool = False):
     key = os.environ.get("GEMINI_API_KEY", "")
