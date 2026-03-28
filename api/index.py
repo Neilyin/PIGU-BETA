@@ -29,6 +29,9 @@ class NewsReq(BaseModel):
 class ContentReq(BaseModel):
     topic: str
     context: Optional[str] = None
+    tone: Optional[str] = "輕鬆活潑"
+    video_type: Optional[str] = "長影音"
+    platforms: Optional[str] = None  # "youtube,instagram,threads"
 
 # ── SSE Stream helper ──────────────────────────────────────────────────────────
 def stream_response(system: str, user_msg: str, use_web_search: bool = False):
@@ -62,209 +65,155 @@ def stream_response(system: str, user_msg: str, use_web_search: bool = False):
 # ── 1. 找新聞的 ────────────────────────────────────────────────────────────────
 @app.post("/api/news")
 async def news(req: NewsReq):
-    system = """你是一位專業的科技/AI 新聞研究員。任務是搜尋並整理最新的熱門話題給台灣自媒體創作者使用。
+    system = """你是科技/AI 新聞研究員，整理最新熱門話題給台灣自媒體創作者。
 
-請以下列格式輸出 6-8 條新聞（繁體中文）：
-
-## 🔥 今日熱門話題
+## 🔥 今日熱門話題（輸出6-8條，繁體中文）
 
 ---
 ### 1. [新聞標題]
 **熱度：** ⭐⭐⭐⭐⭐
 **摘要：** [2-3句重點]
 **爆點：** [為什麼現在很熱？]
-**內容潛力：** [適合腳本/文章/圖文？]
+**內容潛力：** [腳本/文章/圖文？]
 ---"""
     return stream_response(
         system,
-        f"請搜尋「{req.keyword}」的最新熱門話題，整理成創作者可用的格式。",
+        f"搜尋「{req.keyword}」最新熱門話題，整理成創作者可用格式。",
         use_web_search=True,
     )
 
 # ── 2. 腳本生產師 ──────────────────────────────────────────────────────────────
 @app.post("/api/script")
 async def script(req: ContentReq):
-    system = """你是專業科技 YouTube 腳本師，擅長把 AI/科技話題變成讓觀眾欲罷不能的影片腳本。
+    tone = req.tone or "輕鬆活潑"
+    ctx = f"\n\n背景資料：\n{req.context}" if req.context else ""
 
-請生成完整腳本：
+    if req.video_type == "短影音":
+        system = f"""你是短影音腳本師，語氣{tone}，專注台灣觀眾。
 
-# 🎬 影片腳本
+# ⚡ 60秒短影音腳本
 
-**預估時長：** X-X 分鐘
-**目標觀眾：** [描述]
-**核心訊息：** [一句話]
+**開場3秒鉤子：** [超震驚的第一句話]
+**核心一句話：** [整支影片最重要的觀點]
+
+**重點1：** [15字內]
+**重點2：** [15字內]
+**重點3：** [15字內]
+
+**結尾CTA：** [關注+留言引導]
+
+**字幕建議：** [每句15字以內，適合手機看]
+
+繁體中文，節奏快，適合 TikTok/Reels/Shorts。"""
+        return stream_response(system, f"主題：{req.topic}{ctx}")
+    else:
+        system = f"""你是科技 YouTube 腳本師，語氣{tone}，專注台灣觀眾。
+
+# 🎬 影片腳本（5-8分鐘）
+
+**預估時長：** X分鐘 ｜ **目標觀眾：** [描述] ｜ **核心訊息：** [一句話]
 
 ---
-
 ## ⚡ 開場 Hook（0-30秒）
 [強力開場，前3秒抓住觀眾]
 
----
-
-## 📌 主體內容
-
+## 📌 主體
 ### 第一段：背景/痛點
-### 第二段：核心內容（含數據、案例）
+### 第二段：核心內容（含數據）
 ### 第三段：實際應用
 
----
-
 ## 🎯 結尾 CTA
-[訂閱提醒、留言引導、下集預告]
-
----
+[訂閱+留言+下集預告]
 
 ## 📝 SEO
 **標題選項（3個）：**
 **標籤：**
 
-台灣繁體中文，活潑有個性的風格。"""
-    ctx = f"\n\n背景資料：\n{req.context}" if req.context else ""
-    return stream_response(system, f"請為此主題製作完整影片腳本：{req.topic}{ctx}")
+繁體中文。"""
+        return stream_response(system, f"主題：{req.topic}{ctx}")
 
 # ── 3. 文章生產師 ──────────────────────────────────────────────────────────────
 @app.post("/api/article")
 async def article(req: ContentReq):
-    system = """你是專業科技媒體文章作家，把 AI/科技話題寫成既深度又易讀的文章，適合台灣讀者。
+    tone = req.tone or "輕鬆易讀"
+    ctx = f"\n\n參考資料：\n{req.context}" if req.context else ""
+    system = f"""你是科技媒體文章作家，語氣{tone}，適合台灣讀者。
 
 # [文章主標題]
-
-> [副標題：一句話說明核心價值]
-
+> [副標題]
 **閱讀時間：** 約X分鐘
 
----
-
 ## 前言
-[引人入勝的開頭]
-
 ## [小標題1]
-[詳細內容，含數據、引用]
-
 ## [小標題2]
-
 ## [小標題3]
+## 結論
 
-## 結論：對你的影響
-[實際建議]
+**SEO：** 主要關鍵字 / Meta Description
 
----
-
-**SEO 優化：**
-- 主要關鍵字：
-- Meta Description：
-
-台灣繁體中文，適合 Medium/方格子/Vocus 發布。"""
-    ctx = f"\n\n參考資料：\n{req.context}" if req.context else ""
-    return stream_response(system, f"請為此主題撰寫完整深度文章：{req.topic}{ctx}")
+繁體中文，適合 Medium/方格子/Vocus。"""
+    return stream_response(system, f"主題：{req.topic}{ctx}")
 
 # ── 4. 圖文生產師 ──────────────────────────────────────────────────────────────
+PLATFORM_TEMPLATES = {
+    "youtube":   "## 📺 YouTube 社群貼文\n[100字以內，附表情符號]",
+    "instagram": "## 📸 Instagram\n**圖片建議：** [...]\n**文案：** [150字]\n**Hashtag：** [10個#標籤]",
+    "threads":   "## 🧵 Threads\n[200字以內，引發留言互動]",
+    "facebook":  "## 📘 Facebook\n[300字，適合分享連結]",
+    "dcard":     "## 💬 Dcard\n**板：** [建議板塊]\n**標題：** [吸引點擊的標題]\n**內文：** [500字，朋友聊天口吻]",
+    "tiktok":    "## 🎵 TikTok/抖音\n**開場3秒：** [震驚感文字]\n**說明文字：** [50字+熱門標籤]",
+}
+
 @app.post("/api/graphic")
 async def graphic(req: ContentReq):
-    system = """你是社群媒體文案專家，為各平台製作吸引人的圖文貼文。
+    selected = [p.strip() for p in req.platforms.split(",")] if req.platforms else list(PLATFORM_TEMPLATES.keys())
+    sections = "\n\n---\n".join(PLATFORM_TEMPLATES[p] for p in selected if p in PLATFORM_TEMPLATES)
+    tone = req.tone or "活潑吸睛"
+    system = f"""你是社群媒體文案專家，語氣{tone}，只輸出以下選定平台的貼文，繁體中文。
 
-# 🖼️ 多平台圖文貼文
+# 🖼️ 圖文貼文
 
----
-## 📺 YouTube 社群貼文
-[100字以內]
-
----
-## 📸 Instagram
-**圖片建議：** [...]
-**貼文文案：** [150-200字]
-**Hashtag：** #[...] #[...]（10-15個）
-
----
-## 🧵 Threads
-[200字以內，引發互動]
-
----
-## 📘 Facebook
-[300字，可分享連結]
-
----
-## 💬 Dcard
-**板：** [建議板塊]
-**標題：** [吸引點擊]
-**內文：** [500-800字，像朋友聊天的口吻]
-
----
-## 🎵 TikTok
-**開場3秒文字：** [震驚感]
-**說明文字：** [50字]
+{sections}
 
 ---
 ## 💡 圖片設計建議
-[配色、版型、重點文字]
-
-台灣繁體中文，各平台符合該平台用戶習慣。"""
-    ctx = f"\n\n背景資料：\n{req.context}" if req.context else ""
-    return stream_response(system, f"請為此主題製作各平台圖文貼文：{req.topic}{ctx}")
+[配色、版型、重點文字]"""
+    ctx = f"\n\n背景：\n{req.context}" if req.context else ""
+    return stream_response(system, f"主題：{req.topic}{ctx}")
 
 # ── 5. PM 管理師 ───────────────────────────────────────────────────────────────
 @app.post("/api/pm")
 async def pm(req: ContentReq):
-    system = """你是資深內容策略 PM，協助科技自媒體規劃策略、評估商業價值。
+    system = """你是資深內容策略 PM，協助台灣科技自媒體規劃策略。
 
-# 📋 PM 策略分析報告
+# 📋 PM 策略分析
 
----
-## 🎯 主題評估
-**商業價值：** ⭐⭐⭐⭐⭐ (X/5)
-**受眾吸引力：** ⭐⭐⭐⭐⭐ (X/5)
-**競爭程度：** [低/中/高]
-
----
-## 💰 商業潛力
-### 品牌合作機會
-### 流量變現
-### 課程/知識變現
-
----
-## 📅 建議發布排程
-| 日期 | 平台 | 內容 | 說明 |
-|------|------|------|------|
-| Day 1 | YouTube | 完整影片 | ... |
-
----
+## 🎯 主題評估（商業/受眾/競爭 各⭐評分）
+## 💰 商業潛力（品牌合作/流量/課程）
+## 📅 建議發布排程（表格：日期/平台/內容/說明）
 ## 🔥 差異化建議
-[競品分析 + 獨特切角]
+## 📊 KPI 目標（7天/30天）
+## ✅ 本週行動清單（可勾選）
 
----
-## 📊 KPI 目標
-- 7天目標：
-- 30天目標：
-
----
-## ✅ 行動清單（本週）
-- [ ] [任務1]
-- [ ] [任務2]
-
-具體數字和可執行建議，台灣繁體中文。"""
-    ctx = f"\n\n相關資料：\n{req.context}" if req.context else ""
-    return stream_response(system, f"請為此主題提供完整 PM 策略分析：{req.topic}{ctx}")
+具體數字，台灣繁體中文。"""
+    ctx = f"\n\n資料：\n{req.context}" if req.context else ""
+    return stream_response(system, f"主題：{req.topic}{ctx}")
 
 # ── 6. 數據管理師 AI 分析 ──────────────────────────────────────────────────────
 @app.post("/api/insight")
 async def insight(req: ContentReq):
-    system = """你是數據分析師，幫助自媒體創作者解讀內容數據，找出成長機會。
+    system = """你是數據分析師，幫台灣自媒體創作者解讀數據。
 
 # 📊 數據洞察報告
 
----
 ## 📈 表現概覽
 ## 🌟 亮點發現
 ## ⚠️ 需注意的地方
-## 💡 優化建議（可立即執行）
-1. [具體建議]
-2. [具體建議]
-3. [具體建議]
+## 💡 立即可執行的優化（3條）
 ## 🎯 下週行動計畫
-## 📅 追蹤建議
 
-以數據為基礎，台灣繁體中文。"""
-    return stream_response(system, f"請分析以下數據：\n\n{req.topic}\n\n{req.context or ''}")
+以數據為基礎，繁體中文。"""
+    return stream_response(system, f"分析數據：\n\n{req.topic}\n\n{req.context or ''}")
 
 # ── Health check ───────────────────────────────────────────────────────────────
 @app.get("/api/health")

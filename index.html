@@ -295,6 +295,13 @@
           </span>
         </div>
         <div class="out" id="news-out">點擊「搜尋熱門話題」開始...</div>
+        <div class="flex gap8" id="news-sendbar" style="display:none;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">📤 一鍵送給：</span>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('news','script')">🎬 腳本師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('news','article')">✍️ 文章師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('news','graphic')">🖼️ 圖文師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('news','pm')">📋 PM 師</button>
+        </div>
       </div>
     </div>
 
@@ -306,6 +313,24 @@
           <div class="card-title"><div class="abar" style="background:var(--purple)"></div>腳本設定</div>
           <div class="field"><label>影片主題</label><input id="script-topic" placeholder="e.g. GPT-5 正式發布，改變了什麼？"></div>
           <div class="field"><label>背景資料（可選）</label><textarea id="script-ctx" placeholder="貼上相關新聞、數據..."></textarea></div>
+          <div class="g2" style="margin-bottom:11px">
+            <div class="field" style="margin-bottom:0">
+              <label>影片類型</label>
+              <div class="flex gap8" style="margin-top:6px;flex-wrap:wrap">
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:13px"><input type="radio" name="vtype" value="長影音" checked> 📹 長影音 5-8分</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:13px"><input type="radio" name="vtype" value="短影音"> ⚡ 短影音 60秒</label>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>語氣風格</label>
+              <select id="script-tone">
+                <option value="輕鬆活潑">😄 輕鬆活潑</option>
+                <option value="專業嚴肅">🎓 專業嚴肅</option>
+                <option value="幽默搞笑">😂 幽默搞笑</option>
+                <option value="熱血激勵">🔥 熱血激勵</option>
+              </select>
+            </div>
+          </div>
           <button class="btn btn-purple" id="script-btn" onclick="doScript()">✨ 生成腳本</button>
         </div>
         <div class="card">
@@ -326,6 +351,12 @@
           </span>
         </div>
         <div class="out" id="script-out">輸入主題後點擊「生成腳本」...</div>
+        <div class="flex gap8" id="script-sendbar" style="display:none;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">📤 一鍵送給：</span>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('script','article')">✍️ 文章師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('script','graphic')">🖼️ 圖文師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('script','pm')">📋 PM 師</button>
+        </div>
       </div>
     </div>
 
@@ -357,6 +388,12 @@
           </span>
         </div>
         <div class="out" id="article-out">輸入主題後點擊「生成文章」...</div>
+        <div class="flex gap8" id="article-sendbar" style="display:none;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">📤 一鍵送給：</span>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('article','script')">🎬 腳本師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('article','graphic')">🖼️ 圖文師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('article','pm')">📋 PM 師</button>
+        </div>
       </div>
     </div>
 
@@ -371,16 +408,24 @@
           <button class="btn btn-orange" id="graphic-btn" onclick="doGraphic()">✨ 生成各平台貼文</button>
         </div>
         <div class="card">
-          <div class="card-title"><div class="abar" style="background:var(--orange)"></div>支援平台</div>
-          <div class="chips" style="margin-bottom:10px">
-            <span class="ptag pt-youtube">📺 YouTube</span>
-            <span class="ptag pt-instagram">📸 Instagram</span>
-            <span class="ptag pt-threads">🧵 Threads</span>
-            <span class="ptag pt-facebook">📘 Facebook</span>
-            <span class="ptag pt-dcard">💬 Dcard</span>
-            <span class="ptag pt-tiktok">🎵 TikTok</span>
+          <div class="card-title"><div class="abar" style="background:var(--orange)"></div>選擇生成平台 <span style="font-size:11px;color:var(--muted);font-weight:400">（只生成勾選的，省 Token）</span></div>
+          <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:10px">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" name="plt" value="youtube" checked> <span class="ptag pt-youtube">📺 YouTube</span></label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" name="plt" value="instagram" checked> <span class="ptag pt-instagram">📸 Instagram</span></label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" name="plt" value="threads"> <span class="ptag pt-threads">🧵 Threads</span></label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" name="plt" value="facebook"> <span class="ptag pt-facebook">📘 Facebook</span></label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" name="plt" value="dcard"> <span class="ptag pt-dcard">💬 Dcard</span></label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" name="plt" value="tiktok"> <span class="ptag pt-tiktok">🎵 TikTok</span></label>
           </div>
-          <p class="text-muted" style="font-size:13px">每個平台都根據其用戶習慣調整文案風格與長度</p>
+          <div class="field" style="margin-bottom:0">
+            <label>語氣風格</label>
+            <select id="graphic-tone">
+              <option value="活潑吸睛">🎯 活潑吸睛</option>
+              <option value="專業知識型">📚 專業知識型</option>
+              <option value="幽默有哏">😂 幽默有哏</option>
+              <option value="溫暖親切">💛 溫暖親切</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="card">
@@ -391,6 +436,12 @@
           </span>
         </div>
         <div class="out" id="graphic-out">輸入主題後點擊「生成各平台貼文」...</div>
+        <div class="flex gap8" id="graphic-sendbar" style="display:none;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;color:var(--muted);flex-shrink:0">📤 一鍵送給：</span>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('graphic','script')">🎬 腳本師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('graphic','article')">✍️ 文章師</button>
+          <button class="btn btn-ghost btn-sm" onclick="sendTo('graphic','pm')">📋 PM 師</button>
+        </div>
       </div>
     </div>
 
@@ -648,11 +699,12 @@ document.querySelectorAll('.tab[data-an]').forEach(t => t.addEventListener('clic
 }));
 
 // ─────────────── SSE Stream ───────────────────────────────────────────────────
-async function stream(url, body, outId, btnId) {
+async function stream(url, body, outId, btnId, sendBarId) {
   const out = $(outId), btn = $(btnId);
   out.textContent = '';
   out.classList.add('streaming');
   if (btn) btn.disabled = true;
+  if (sendBarId) $(sendBarId).style.display = 'none';
 
   try {
     const resp = await fetch(url, {
@@ -684,30 +736,65 @@ async function stream(url, body, outId, btnId) {
   } finally {
     out.classList.remove('streaming');
     if (btn) btn.disabled = false;
+    if (sendBarId && !out.textContent.startsWith('❌')) $(sendBarId).style.display = 'flex';
   }
 }
 
 // ─────────────── Agent Actions ────────────────────────────────────────────────
-function doNews()    { stream('/api/news',    {keyword: $('news-kw').value || 'AI 科技最新動態'}, 'news-out', 'news-btn'); }
-function doScript()  {
-  if (!$('script-topic').value)  { toast('⚠️ 請輸入主題'); return; }
-  stream('/api/script',  {topic:$('script-topic').value,  context:$('script-ctx').value},   'script-out',  'script-btn');
+function doNews() {
+  stream('/api/news', {keyword: $('news-kw').value || 'AI 科技最新動態'}, 'news-out', 'news-btn', 'news-sendbar');
+}
+function doScript() {
+  if (!$('script-topic').value) { toast('⚠️ 請輸入主題'); return; }
+  const vtype = document.querySelector('input[name="vtype"]:checked')?.value || '長影音';
+  stream('/api/script', {
+    topic: $('script-topic').value, context: $('script-ctx').value,
+    video_type: vtype, tone: $('script-tone').value,
+  }, 'script-out', 'script-btn', 'script-sendbar');
 }
 function doArticle() {
   if (!$('article-topic').value) { toast('⚠️ 請輸入主題'); return; }
-  stream('/api/article', {topic:$('article-topic').value, context:$('article-ctx').value},  'article-out', 'article-btn');
+  stream('/api/article', {
+    topic: $('article-topic').value, context: $('article-ctx').value,
+  }, 'article-out', 'article-btn', 'article-sendbar');
 }
 function doGraphic() {
   if (!$('graphic-topic').value) { toast('⚠️ 請輸入主題'); return; }
-  stream('/api/graphic', {topic:$('graphic-topic').value, context:$('graphic-ctx').value},  'graphic-out', 'graphic-btn');
+  const plt = Array.from(document.querySelectorAll('input[name="plt"]:checked')).map(x=>x.value);
+  if (!plt.length) { toast('⚠️ 請至少選一個平台'); return; }
+  stream('/api/graphic', {
+    topic: $('graphic-topic').value, context: $('graphic-ctx').value,
+    platforms: plt.join(','), tone: $('graphic-tone').value,
+  }, 'graphic-out', 'graphic-btn', 'graphic-sendbar');
 }
-function doPM()      {
-  if (!$('pm-topic').value)      { toast('⚠️ 請輸入主題'); return; }
-  stream('/api/pm',      {topic:$('pm-topic').value,      context:$('pm-ctx').value},       'pm-out',      'pm-btn');
+function doPM() {
+  if (!$('pm-topic').value) { toast('⚠️ 請輸入主題'); return; }
+  stream('/api/pm', {topic: $('pm-topic').value, context: $('pm-ctx').value}, 'pm-out', 'pm-btn');
 }
 function doInsight() {
-  if (!$('insight-data').value)  { toast('⚠️ 請輸入數據'); return; }
-  stream('/api/insight', {topic:$('insight-data').value}, 'insight-out', 'insight-btn');
+  if (!$('insight-data').value) { toast('⚠️ 請輸入數據'); return; }
+  stream('/api/insight', {topic: $('insight-data').value}, 'insight-out', 'insight-btn');
+}
+
+// ─────────────── Agent 互傳 ───────────────────────────────────────────────────
+function sendTo(from, to) {
+  const content = $(from + '-out')?.textContent || '';
+  const topicEl = $(from + '-topic') || $(from + '-kw');
+  const topic = topicEl?.value || '';
+  const ctx = content.slice(0, 1000);
+
+  const MAP = {
+    script:  { topic: 'script-topic',  ctx: 'script-ctx'  },
+    article: { topic: 'article-topic', ctx: 'article-ctx' },
+    graphic: { topic: 'graphic-topic', ctx: 'graphic-ctx' },
+    pm:      { topic: 'pm-topic',      ctx: 'pm-ctx'      },
+  };
+  if (!MAP[to]) return;
+  if (topic) $(MAP[to].topic).value = topic;
+  $(MAP[to].ctx).value = ctx;
+  goto(to);
+  const labels = {script:'🎬 腳本師', article:'✍️ 文章師', graphic:'🖼️ 圖文師', pm:'📋 PM 師'};
+  toast(`✅ 已送到 ${labels[to]}，可直接生成！`);
 }
 
 // ─────────────── Save Content ─────────────────────────────────────────────────
