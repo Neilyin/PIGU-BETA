@@ -929,20 +929,37 @@ function loadAnalytics() {
 function delAn(id) { if(!confirm('確定刪除？'))return; DB.del('analytics',id); loadAnalytics(); }
 
 async function autoFetch() {
-  const url = $('an-url').value;
+  const url = $('an-url').value.trim();
   if (!url) { toast('⚠️ 請先輸入連結'); return; }
-  const btn = event.target; btn.textContent='⏳'; btn.disabled=true;
+  const btn = event.target; btn.textContent = '⏳ 抓取中...'; btn.disabled = true;
+  toast('🤖 自動抓取中...');
   try {
-    // Try to get meta info via fetch (only works for CORS-open sites)
-    toast('🤖 嘗試自動抓取中...');
-    // For YouTube, we can try to get the title from oEmbed
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`).then(r=>r.json()).catch(()=>null);
-      if (oembed?.title) { $('an-title').value = oembed.title; toast('✅ 已自動填入標題'); }
-      else toast('⚠️ YouTube 需手動輸入數據');
-    } else toast('⚠️ 此平台需手動輸入數據');
-  } catch { toast('⚠️ 無法自動抓取，請手動輸入'); }
-  finally { btn.textContent='🤖 自動抓'; btn.disabled=false; }
+    const res = await fetch(`/api/fetch-stats?url=${encodeURIComponent(url)}`);
+    const d = await res.json();
+
+    if (d.error) { toast('⚠️ ' + d.error); return; }
+
+    // 填入欄位
+    if (d.title)    $('an-title').value    = d.title;
+    if (d.likes)    $('an-likes').value    = d.likes;
+    if (d.comments) $('an-comments').value = d.comments;
+    if (d.views)    $('an-views').value    = d.views;
+    if (d.shares)   $('an-shares').value   = d.shares;
+
+    // 自動選平台
+    if (d.platform) {
+      const sel = $('an-platform');
+      for (const opt of sel.options) { if (opt.value === d.platform) { sel.value = d.platform; break; } }
+    }
+
+    const filled = [d.title && '標題', d.likes && '按讚', d.comments && '留言'].filter(Boolean).join('、');
+    toast(`✅ 已自動填入：${filled || '標題'}${d.note ? '（' + d.note + '）' : ''}`);
+
+  } catch(e) {
+    toast('⚠️ 抓取失敗：' + e.message);
+  } finally {
+    btn.textContent = '🤖 自動抓'; btn.disabled = false;
+  }
 }
 
 function fillInsightAuto() {

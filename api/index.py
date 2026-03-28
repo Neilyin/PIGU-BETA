@@ -4,7 +4,9 @@ AI 內容工廠 — Vercel Serverless API
 """
 import json
 import os
+import re
 import anthropic
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -214,6 +216,65 @@ async def insight(req: ContentReq):
 
 以數據為基礎，繁體中文。"""
     return stream_response(system, f"分析數據：\n\n{req.topic}\n\n{req.context or ''}")
+
+# ── 自動抓取平台數據 ────────────────────────────────────────────────────────────
+@app.get("/api/fetch-stats")
+async def fetch_stats(url: str):
+    """抓取各平台公開數據（目前支援 YouTube, Dcard）"""
+    try:
+        # ── Dcard ──────────────────────────────────────────────────────────────
+        if "dcard.tw" in url:
+            match = re.search(r"/p/(\d+)", url)
+            if not match:
+                return {"error": "無法解析 Dcard 網址，格式應為 dcard.tw/f/.../p/12345678"}
+            post_id = match.group(1)
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"https://www.dcard.tw/service/api/v2/posts/{post_id}",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                        "Referer": "https://www.dcard.tw/",
+                    }
+                )
+                if resp.status_code != 200:
+                    return {"error": f"Dcard API 回傳 {resp.status_code}，可能是私人貼文或網址錯誤"}
+                d = resp.json()
+                return {
+                    "platform": "dcard",
+                    "title":    d.get("title", ""),
+                    "likes":    d.get("likeCount", 0),
+                    "comments": d.get("commentCount", 0),
+                    "views":    0,   # Dcard 不公開瀏覽數
+                    "shares":   0,
+                    "forum":    d.get("forumName", ""),
+                    "created":  d.get("createdAt", "")[:10] if d.get("createdAt") else "",
+                }
+
+        # ── YouTube oEmbed（標題用，數字需 YouTube Data API）────────────────────
+        elif "youtube.com" in url or "youtu.be" in url:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"https://www.youtube.com/oembed?url={url}&format=json"
+                )
+                if resp.status_code == 200:
+                    d = resp.json()
+                    return {
+                        "platform": "youtube",
+                        "title":    d.get("title", ""),
+                        "likes":    0,
+                        "comments": 0,
+                        "views":    0,
+                        "note":     "YouTube 數字請手動填入（需 YouTube Data API）",
+                    }
+            return {"error": "無法抓取 YouTube 標題"}
+
+        else:
+            return {"error": "目前支援：Dcard、YouTube（標題）"}
+
+    except httpx.TimeoutException:
+        return {"error": "請求逾時，請稍後再試"}
+    except Exception as e:
+        return {"error": str(e)}
 
 # ── Health check ───────────────────────────────────────────────────────────────
 @app.get("/api/health")
